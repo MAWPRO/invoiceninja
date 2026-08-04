@@ -1,0 +1,22 @@
+name: Trigger custom image build
+
+# Notifies MAWPRO/dockerfiles to rebuild+push the ghcr.io image whenever this
+# fork's stable branch changes. Requires a repo secret DOCKERFILES_DISPATCH_TOKEN
+# holding a token with permission to trigger workflow dispatches on
+# MAWPRO/dockerfiles (classic PAT with "repo" scope, or a fine-grained PAT
+# scoped to that repo with Actions: write).
+on:
+  push:
+    branches: [v5-stable]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify dockerfiles repo
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: token ${{ secrets.DOCKERFILES_DISPATCH_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/MAWPRO/dockerfiles/dispatches \
+            -d '{"event_type":"rebuild","client_payload":{"app_ref":"v5-stable","ui_ref":"main"}}'
