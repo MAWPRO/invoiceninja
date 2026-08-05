@@ -69,11 +69,39 @@ class MailgunController extends BaseController
 
         $input = $request->all();
 
-        if (\abs(\time() - $request['signature']['timestamp']) > 15) {
+        // TEMPORARY diagnostic logging while chasing down why webhooks weren't
+        // resulting in ProcessMailgunWebhook being dispatched. Remove once
+        // confirmed working — nothing here changes the response Mailgun sees.
+        nlog('Mailgun webhook received', [
+            'content_type' => $request->header('Content-Type'),
+            'top_level_keys' => array_keys($input),
+            'event' => $input['event-data']['event'] ?? null,
+            'has_signature_block' => isset($input['signature']),
+            'signing_key_configured' => strlen((string) config('services.mailgun.webhook_signing_key')) > 0,
+        ]);
+
+        if (!isset($input['signature']['timestamp'], $input['signature']['token'], $input['signature']['signature'])) {
+            nlog('Mailgun webhook rejected: no signature block in payload', ['input' => $input]);
             return response()->json(['message' => 'Success'], 200);
         }
 
-        if (\hash_equals(\hash_hmac('sha256', $input['signature']['timestamp'] . $input['signature']['token'], config('services.mailgun.webhook_signing_key')), $input['signature']['signature'])) {
+        $age = \abs(\time() - (int) $input['signature']['timestamp']);
+
+        if ($age > 15) {
+            nlog('Mailgun webhook rejected: timestamp outside 15s tolerance', [
+                'age_seconds' => $age,
+                'payload_timestamp' => $input['signature']['timestamp'],
+                'server_time' => \time(),
+            ]);
+            return response()->json(['message' => 'Success'], 200);
+        }
+
+        $expected = \hash_hmac('sha256', $input['signature']['timestamp'] . $input['signature']['token'], config('services.mailgun.webhook_signing_key'));
+        $matches = \hash_equals($expected, $input['signature']['signature']);
+
+        nlog('Mailgun webhook signature check', ['matches' => $matches]);
+
+        if ($matches) {
             ProcessMailgunWebhook::dispatch($request->all())->delay(rand(2, 10));
         }
 
