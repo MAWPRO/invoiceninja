@@ -111,6 +111,7 @@ use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SelfUpdateController;
 use App\Http\Controllers\SmtpController;
+use App\Http\Controllers\EmailProviderController;
 use App\Http\Controllers\SNSController;
 use App\Http\Controllers\StaticController;
 use App\Http\Controllers\StripeController;
@@ -482,6 +483,7 @@ Route::group(['middleware' => ['throttle:api', 'token_auth', 'valid_json','local
     // Route::delete('hooks/{subscription_id}', [SubscriptionController::class, 'unsubscribe'])->name('hooks.unsubscribe');
 
     Route::post('smtp/check', [SmtpController::class, 'check'])->name('smtp.check')->middleware('throttle:10,1');
+    Route::post('email_provider/check', [EmailProviderController::class, 'check'])->name('email_provider.check')->middleware('throttle:10,1');
 
     Route::post('stripe/update_payment_methods', [StripeController::class, 'update'])->middleware('password_protected')->name('stripe.update');
     Route::post('stripe/import_customers', [StripeController::class, 'import'])->middleware('password_protected')->name('stripe.import');
